@@ -13,24 +13,12 @@ const ensureV1 = (url) => {
   return /\/v1$/.test(trimmed) ? trimmed : `${trimmed}/v1`;
 };
 
-const buildOptions = ({ requiresExternalUrl, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl, cloudEnabled, cloudUrl, savedPresets, withV1 }) => {
+const buildOptions = ({ requiresExternalUrl, savedPresets, withV1 }) => {
   const opts = [];
   const wrap = (url) => (withV1 ? ensureV1(url) : (url || "").replace(/\/+$/, ""));
   if (!requiresExternalUrl) {
     const localUrl = wrap(`http://127.0.0.1:${UPDATER_CONFIG.appPort}`);
     opts.push({ value: "local", label: localUrl, url: localUrl });
-  }
-  if (tunnelEnabled && tunnelPublicUrl) {
-    const u = wrap(tunnelPublicUrl);
-    opts.push({ value: "tunnel", label: u, url: u });
-  }
-  if (tailscaleEnabled && tailscaleUrl) {
-    const u = wrap(tailscaleUrl);
-    opts.push({ value: "tailscale", label: u, url: u });
-  }
-  if (cloudEnabled && cloudUrl) {
-    const u = wrap(cloudUrl);
-    opts.push({ value: "cloud", label: u, url: u });
   }
   savedPresets.forEach((p) => {
     opts.push({ value: `saved:${p.name}`, label: p.baseUrl, url: p.baseUrl, saved: true });
@@ -43,12 +31,6 @@ export default function BaseUrlSelect({
   value,
   onChange,
   requiresExternalUrl = false,
-  tunnelEnabled = false,
-  tunnelPublicUrl = "",
-  tailscaleEnabled = false,
-  tailscaleUrl = "",
-  cloudEnabled = false,
-  cloudUrl = "",
   withV1 = true,
   currentUrl = "",
 }) {
@@ -82,8 +64,8 @@ export default function BaseUrlSelect({
   }, []);
 
   const options = useMemo(
-    () => buildOptions({ requiresExternalUrl, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl, cloudEnabled, cloudUrl, savedPresets, withV1 }),
-    [requiresExternalUrl, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl, cloudEnabled, cloudUrl, savedPresets, withV1]
+    () => buildOptions({ requiresExternalUrl, savedPresets, withV1 }),
+    [requiresExternalUrl, savedPresets, withV1]
   );
 
   // Sync the active config URL without replacing edits unless the config itself changes.

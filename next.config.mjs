@@ -1,5 +1,30 @@
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+
+// Build isolation: @vercel/nft (Next's file tracer) resolves the config paths the
+// app discovers from os.homedir()/APPDATA/LOCALAPPDATA/tmpdir and then walks every
+// match. On a real user profile that means gigabytes of memory, the developer's own
+// config files inside the standalone trace, and on Windows a hard failure as soon
+// as one profile entry is unreadable (a stale temp dir owned by another account).
+// Production builds therefore run against a throwaway profile; the running app
+// still reads the real one.
+if (process.env.NODE_ENV === "production") {
+  const buildHome = join(tmpdir(), "lllrouter-build-home");
+  const buildAppData = join(buildHome, "AppData");
+  const buildTemp = join(buildHome, "tmp");
+  mkdirSync(join(buildAppData, "Local"), { recursive: true });
+  mkdirSync(join(buildAppData, "Roaming"), { recursive: true });
+  mkdirSync(buildTemp, { recursive: true });
+  process.env.HOME = buildHome;
+  process.env.USERPROFILE = buildHome;
+  process.env.APPDATA = join(buildAppData, "Roaming");
+  process.env.LOCALAPPDATA = join(buildAppData, "Local");
+  process.env.TEMP = buildTemp;
+  process.env.TMP = buildTemp;
+  process.env.TMPDIR = buildTemp;
+}
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 // CLI bundling needs workspace root so tracing includes hoisted node_modules (slim ~50MB).
@@ -77,18 +102,6 @@ const nextConfig = {
       {
         source: "/responses",
         destination: "/api/v1/responses"
-      },
-      {
-        source: "/systemone",
-        destination: "/api/v1/systemone"
-      },
-      {
-        source: "/v1beta/:path*",
-        destination: "/api/v1beta/:path*"
-      },
-      {
-        source: "/v1beta",
-        destination: "/api/v1beta"
       },
       {
         source: "/v1/:path*",

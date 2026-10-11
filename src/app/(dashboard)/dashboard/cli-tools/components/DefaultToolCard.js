@@ -7,7 +7,7 @@ import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import Image from "next/image";
 import ApiKeySelect from "./ApiKeySelect";
 
-export default function DefaultToolCard({ toolId, tool, isExpanded, onToggle, baseUrl, apiKeys, activeProviders = [], cloudEnabled = false, tunnelEnabled = false }) {
+export default function DefaultToolCard({ toolId, tool, isExpanded, onToggle, baseUrl, apiKeys, activeProviders = [] }) {
   const [copiedField, setCopiedField] = useState(null);
   const [showModelModal, setShowModelModal] = useState(false);
   const [modelValue, setModelValue] = useState("");
@@ -20,7 +20,7 @@ export default function DefaultToolCard({ toolId, tool, isExpanded, onToggle, ba
   const replaceVars = (text) => {
     const keyToUse = (selectedApiKey && selectedApiKey.trim()) 
       ? selectedApiKey 
-      : (!cloudEnabled ? "sk_9router" : "your-api-key");
+      : "sk_lllrouter";
     
     // Add /v1 suffix only if not already present (DRY - avoid duplicate)
     const normalizedBaseUrl = baseUrl || "http://localhost:20128";
@@ -50,7 +50,7 @@ export default function DefaultToolCard({ toolId, tool, isExpanded, onToggle, ba
 
   const renderApiKeySelector = () => (
     <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
-      <ApiKeySelect value={selectedApiKey} onChange={setSelectedApiKey} apiKeys={apiKeys} cloudEnabled={cloudEnabled} className="flex-1" />
+      <ApiKeySelect value={selectedApiKey} onChange={setSelectedApiKey} apiKeys={apiKeys} className="flex-1" />
     </div>
   );
 
@@ -104,11 +104,7 @@ export default function DefaultToolCard({ toolId, tool, isExpanded, onToggle, ba
     return (
       <div className="flex flex-col gap-2 mb-4">
         {tool.notes.map((note, index) => {
-          // Skip cloudCheck note if tunnel or cloud is enabled
-          if (note.type === "cloudCheck" && (cloudEnabled || tunnelEnabled)) return null;
-          
           const isWarning = note.type === "warning";
-          const isError = note.type === "cloudCheck" && !cloudEnabled && !tunnelEnabled;
           
           let bgClass = "bg-blue-500/10 border-blue-500/30";
           let textClass = "text-blue-600 dark:text-blue-400";
@@ -120,11 +116,6 @@ export default function DefaultToolCard({ toolId, tool, isExpanded, onToggle, ba
             textClass = "text-yellow-600 dark:text-yellow-400";
             iconClass = "text-yellow-500";
             icon = "warning";
-          } else if (isError) {
-            bgClass = "bg-red-500/10 border-red-500/30";
-            textClass = "text-red-600 dark:text-red-400";
-            iconClass = "text-red-500";
-            icon = "error";
           }
           
           return (
@@ -138,19 +129,13 @@ export default function DefaultToolCard({ toolId, tool, isExpanded, onToggle, ba
     );
   };
 
-  const canShowGuide = () => {
-    if (tool.requiresExternalUrl && !cloudEnabled && !tunnelEnabled) return false;
-    if (tool.requiresCloud && !cloudEnabled) return false;
-    return true;
-  };
-
   const renderGuideSteps = () => {
     if (!tool.guideSteps) return <p className="text-text-muted text-sm">Coming soon...</p>;
 
     return (
       <div className="flex flex-col gap-4">
         {renderNotes()}
-        {canShowGuide() && tool.guideSteps.map((item) => (
+        {tool.guideSteps.map((item) => (
           <div key={item.step} className="flex items-start gap-4">
             <div 
               className="size-8 rounded-full flex items-center justify-center shrink-0 text-sm font-semibold text-white"

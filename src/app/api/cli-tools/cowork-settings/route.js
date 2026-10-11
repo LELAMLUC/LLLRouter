@@ -5,13 +5,46 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-import { DEFAULT_PLUGINS, LOCAL_STDIO_PLUGINS, buildManagedMcpServers } from "@/shared/constants/coworkPlugins";
+// ponytail: inline tu coworkPlugins da xoa (giu MCP ngoai Exa/Tavily + bridge entries); xoa han khi bo card Cowork
+const DEFAULT_PLUGINS = [
+  { name: "exa", title: "Exa", description: "Real-time web search and code documentation", url: "https://mcp.exa.ai/mcp", transport: "http", oauth: false, toolNames: ["web_search_exa", "web_fetch_exa"] },
+  { name: "tavily", title: "Tavily", description: "Real-time web search optimized for LLM agents", url: "https://mcp.tavily.com/mcp", transport: "http", oauth: true, toolNames: ["tavily_search", "tavily_extract", "tavily_crawl", "tavily_map"] },
+];
+const LOCAL_STDIO_PLUGINS = [
+  { name: "browsermcp", title: "Browser MCP", description: "Control your running Chrome (requires Chrome extension)", extensionUrl: "https://chromewebstore.google.com/detail/browser-mcp-automate-your/bjfgambnhccakkhmkepdoekmckoijdlc", command: "npx", args: ["-y", "@browsermcp/mcp@latest"], toolNames: ["browser_navigate", "browser_snapshot", "browser_click", "browser_type", "browser_screenshot", "browser_get_console_logs", "browser_wait", "browser_press_key", "browser_go_back", "browser_go_forward"] },
+];
+function buildManagedMcpServers(plugins) {
+  const list = Array.isArray(plugins) ? plugins : [];
+  const out = [];
+  const seen = new Set();
+  for (const pl of list) {
+    if (!pl?.name || !pl?.url || seen.has(pl.name)) continue;
+    seen.add(pl.name);
+    const entry = { name: pl.name, url: pl.url, transport: pl.transport || (/\/sse(|\/)/i.test(pl.url) ? "sse" : "http") };
+    if (pl.oauth) entry.oauth = true;
+    if (Array.isArray(pl.toolNames) && pl.toolNames.length > 0) {
+      const prefix = `${pl.name}-`;
+      const bare = new Set();
+      for (const raw of pl.toolNames) {
+        if (typeof raw !== "string" || !raw) continue;
+        let t = raw;
+        while (t.startsWith(prefix)) t = t.slice(prefix.length);
+        bare.add(t);
+      }
+      const policy = {};
+      for (const t of bare) { policy[t] = "allow"; policy[`${prefix}${t}`] = "allow"; }
+      entry.toolPolicy = policy;
+    }
+    out.push(entry);
+  }
+  return out;
+}
 import { UPDATER_CONFIG } from "@/shared/constants/config";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
 
 const APP_PORT = UPDATER_CONFIG.appPort;
-const CLI_TOKEN_HEADER = "x-9r-cli-token";
-const CLI_TOKEN_SALT = "9r-cli-auth";
+const CLI_TOKEN_HEADER = "x-llr-cli-token";
+const CLI_TOKEN_SALT = "llr-cli-auth";
 const LOCAL_MCP_PREFIX = `http://localhost:${APP_PORT}/api/mcp/`;
 
 let cachedCliToken = null;

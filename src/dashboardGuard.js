@@ -4,8 +4,8 @@ import { getConsistentMachineId } from "@/shared/utils/machineId";
 import { verifyDashboardAuthToken } from "@/lib/auth/dashboardSession";
 import { hasTrustedPeerHeaders } from "@/lib/auth/trustedPeer";
 
-const CLI_TOKEN_HEADER = "x-9r-cli-token";
-const CLI_TOKEN_SALT = "9r-cli-auth";
+const CLI_TOKEN_HEADER = "x-llr-cli-token";
+const CLI_TOKEN_SALT = "llr-cli-auth";
 
 let cachedCliToken = null;
 async function getCliToken() {
@@ -24,11 +24,6 @@ const PUBLIC_API_PATHS = [
   "/api/health",
   "/api/init",
   "/api/locale",
-  "/api/auth/login",
-  "/api/auth/logout",
-  "/api/auth/status",
-  "/api/auth/oidc",
-  "/api/auth/saml",
   "/api/version",
   "/api/settings/require-login",
 ];
@@ -37,56 +32,36 @@ const PUBLIC_API_PATHS = [
 // Keep root-level rewrites here too: middleware runs before Next.js rewrites.
 const PUBLIC_PREFIXES = ["/v1", "/v1beta", "/api/v1", "/api/v1beta", "/codex", "/responses"];
 
-// Always require JWT token regardless of requireLogin setting
+// Always require local access — CLI token or loopback browser session.
 const ALWAYS_PROTECTED = [
-  "/api/shutdown",
   "/api/settings/database",
-  "/api/version/shutdown",
-  "/api/version/update",
   "/api/oauth/cursor/auto-import",
   "/api/oauth/kiro/auto-import",
   "/api/oauth/zed/auto-import",
 ];
 
-// Require auth, but allow through if requireLogin is disabled
+// Require auth, but allow through if requireLogin is disabled (default: open).
 const PROTECTED_API_PATHS = [
   "/api/settings",
   "/api/keys",
   "/api/providers",
   "/api/provider-nodes",
-  "/api/proxy-pools",
   "/api/combos",
   "/api/models",
   "/api/usage",
   "/api/oauth",
-  "/api/cloud",
-  "/api/media-providers",
   "/api/pricing",
   "/api/tags",
   "/api/cli-tools",
-  "/api/mcp",
   "/api/translator",
-  "/api/tunnel",
 ];
 
 // Routes that spawn child processes or read host secrets — restrict to localhost.
 const LOCAL_ONLY_PATHS = [
   "/api/cli-tools/cowork-settings",
-  "/api/cli-tools/antigravity-mitm",
-  "/api/mcp/",
-  "/api/tunnel/tailscale-install",
-  "/api/tunnel/tailscale-enable",
-  "/api/tunnel/tailscale-disable",
-  "/api/tunnel/tailscale-check",
-  "/api/tunnel/enable",
-  "/api/tunnel/disable",
   "/api/oauth/cursor/auto-import",
   "/api/oauth/kiro/auto-import",
   "/api/oauth/zed/auto-import",
-  "/api/auth/reset-password",
-  "/api/headroom/start",
-  "/api/headroom/stop",
-  "/api/headroom/proxy",
 ];
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
@@ -110,7 +85,7 @@ function isLoopbackHostname(h) {
 
 function isLoopbackPeer(request) {
   if (hasTrustedPeerHeaders(request)) {
-    return isLoopbackHostname(request.headers.get("x-9r-real-ip"));
+    return isLoopbackHostname(request.headers.get("x-llr-real-ip"));
   }
   // Bare `next dev` forks its server, so the wrapper never loads and no peer address
   // reaches us. Host is spoofable, so this stays confined to development.
@@ -123,7 +98,7 @@ function isLoopbackPeer(request) {
 export function isLocalRequest(request) {
   // Stamped by custom-server.js when forwarding headers exist: request came through
   // a reverse proxy, so the loopback socket is the proxy hop, not the end-user.
-  if (request.headers.get("x-9r-via-proxy")) return false;
+  if (request.headers.get("x-llr-via-proxy")) return false;
   if (!isLoopbackPeer(request)) return false;
   const origin = request.headers.get("origin");
   if (origin) {
@@ -193,7 +168,6 @@ function isPublicApi(pathname) {
   return PUBLIC_API_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-// Shared with src/proxy.js — the mimo login branch must respect dashboard auth.
 export { isAuthenticated };
 
 export const __test__ = {
@@ -214,9 +188,9 @@ export async function proxy(request) {
     }
   }
 
-  // Always protected - require valid JWT or local CLI token (machineId-based)
+  // Always protected - require local CLI token, local JWT, or loopback session.
   if (ALWAYS_PROTECTED.some((p) => pathname.startsWith(p))) {
-    if (await hasValidCliToken(request) || await hasValidToken(request))
+    if (await canAccessLocalOnlyRoute(request))
       return NextResponse.next();
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -234,48 +208,22 @@ export async function proxy(request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Protect all dashboard routes
+  // Dashboard: open when requireLogin is false (default). No login page exists,
+  // so a missing token answers 401 instead of redirecting anywhere.
   if (pathname.startsWith("/dashboard")) {
-    let requireLogin = true;
-    let tunnelDashboardAccess = true;
-
+    let requireLogin = false;
     try {
       const settings = await loadSettings();
-      if (settings) {
-        requireLogin = settings.requireLogin !== false;
-        tunnelDashboardAccess = settings.tunnelDashboardAccess === true;
-
-        // Block tunnel/tailscale access if disabled (redirect to login)
-        if (!tunnelDashboardAccess) {
-          const host = (request.headers.get("host") || "").split(":")[0].toLowerCase();
-          const tunnelHost = settings.tunnelUrl ? new URL(settings.tunnelUrl).hostname.toLowerCase() : "";
-          const tailscaleHost = settings.tailscaleUrl ? new URL(settings.tailscaleUrl).hostname.toLowerCase() : "";
-          if ((tunnelHost && host === tunnelHost) || (tailscaleHost && host === tailscaleHost)) {
-            return NextResponse.redirect(new URL("/login", request.url));
-          }
-        }
-      }
+      if (settings) requireLogin = settings.requireLogin === true;
     } catch {
-      // On error, keep defaults (require login, block tunnel)
+      // On error, default open (single-user local gateway).
     }
-
-    // If login not required, allow through
     if (!requireLogin) return NextResponse.next();
-
-    // Verify JWT token
-    const token = request.cookies.get("auth_token")?.value;
-    if (token) {
-      if (await verifyDashboardAuthToken(token)) {
-        return NextResponse.next();
-      } else {
-        return NextResponse.redirect(new URL("/login", request.url));
-      }
-    }
-
-    return NextResponse.redirect(new URL("/login", request.url));
+    if (await hasValidToken(request)) return NextResponse.next();
+    return NextResponse.json({ error: "Login required" }, { status: 401 });
   }
 
-  // Redirect / to /dashboard if logged in, or /dashboard if it's the root
+  // Redirect / to /dashboard
   if (pathname === "/") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }

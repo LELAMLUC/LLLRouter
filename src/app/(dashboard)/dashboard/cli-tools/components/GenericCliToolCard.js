@@ -16,12 +16,7 @@ export default function GenericCliToolCard({
   baseUrl,
   apiKeys,
   activeProviders = [],
-  cloudEnabled,
   initialStatus,
-  tunnelEnabled,
-  tunnelPublicUrl,
-  tailscaleEnabled,
-  tailscaleUrl,
 }) {
   const [status, setStatus] = useState(() => initialStatus || null);
   const [checking, setChecking] = useState(false);
@@ -122,7 +117,7 @@ export default function GenericCliToolCard({
   const getConfigStatus = () => {
     if (!status?.installed) return null;
     if (!status.has9Router) return "not_configured";
-    if (currentBaseUrl && matchKnownEndpoint(currentBaseUrl, { tunnelPublicUrl, tailscaleUrl })) {
+    if (currentBaseUrl && matchKnownEndpoint(currentBaseUrl)) {
       return "configured";
     }
     return "configured";
@@ -136,7 +131,7 @@ export default function GenericCliToolCard({
     try {
       const keyToUse = (selectedApiKey && selectedApiKey.trim())
         ? selectedApiKey
-        : (!cloudEnabled ? "sk_9router" : selectedApiKey);
+        : "sk_lllrouter";
 
       const payload = {
         baseUrl: getEffectiveBaseUrl(),
@@ -239,7 +234,7 @@ export default function GenericCliToolCard({
 
   const getManualConfigContent = () => {
     const effectiveUrl = getEffectiveBaseUrl();
-    const key = selectedApiKey || "sk_9router";
+    const key = selectedApiKey || "";
     const mod = selectedModel || "provider/model-id";
 
     switch (tool.id) {
@@ -441,10 +436,6 @@ export default function GenericCliToolCard({
                     value={customBaseUrl || getEffectiveBaseUrl()}
                     onChange={setCustomBaseUrl}
                     requiresExternalUrl={tool.requiresExternalUrl}
-                    tunnelEnabled={tunnelEnabled}
-                    tunnelPublicUrl={tunnelPublicUrl}
-                    tailscaleEnabled={tailscaleEnabled}
-                    tailscaleUrl={tailscaleUrl}
                     currentUrl={currentBaseUrl}
                   />
                 </div>
@@ -464,7 +455,7 @@ export default function GenericCliToolCard({
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr_auto] sm:items-center sm:gap-2">
                   <span className="text-xs font-semibold text-text-main sm:text-right sm:text-sm">API Key</span>
                   <span className="material-symbols-outlined hidden text-text-muted text-[14px] sm:inline">arrow_forward</span>
-                  <ApiKeySelect value={selectedApiKey} onChange={setSelectedApiKey} apiKeys={apiKeys} cloudEnabled={cloudEnabled} />
+                  <ApiKeySelect value={selectedApiKey} onChange={setSelectedApiKey} apiKeys={apiKeys} />
                 </div>
 
                 {/* Models selector cho Pi (multi-models) */}

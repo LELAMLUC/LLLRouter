@@ -1,5 +1,4 @@
 import chalk from "chalk";
-import ora from "ora";
 
 /**
  * UI Helper Functions
@@ -25,8 +24,34 @@ export function gray(message) {
   console.log(chalk.gray(message));
 }
 
+// Server-side replacement for the removed `ora` dependency: same call surface
+// (start/stop/succeed/fail + .text) but plain console lines.
 export function spinner(text) {
-  return ora(text);
+  let label = text || "";
+  return {
+    start(next) {
+      if (typeof next === "string") label = next;
+      console.log(chalk.gray(`  ${label}`));
+      return this;
+    },
+    stop() {
+      return this;
+    },
+    succeed(message) {
+      console.log(chalk.green(`✓ ${message || label}`));
+      return this;
+    },
+    fail(message) {
+      console.log(chalk.red(`✗ ${message || label}`));
+      return this;
+    },
+    get text() {
+      return label;
+    },
+    set text(value) {
+      label = value || "";
+    },
+  };
 }
 
 export function printSection(title) {

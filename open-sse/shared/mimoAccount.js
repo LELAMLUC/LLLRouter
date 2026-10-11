@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { proxyAwareFetch } from "../utils/proxyFetch.js";
+import { tempDir } from "../utils/tempDir.js";
 
 /**
  * Xiaomi MiMo account-session helpers (used for weekly quota).
@@ -75,7 +76,7 @@ function desktopCookiePath() {
 async function readDesktopAccountCookies() {
   const src = desktopCookiePath();
   if (!fs.existsSync(src)) return null;
-  const tmp = path.join(os.tmpdir(), `9r-mimo-cookies-${process.pid}-${crypto.randomBytes(4).toString("hex")}.db`);
+  const tmp = path.join(tempDir(), `9r-mimo-cookies-${process.pid}-${crypto.randomBytes(4).toString("hex")}.db`);
   try {
     fs.copyFileSync(src, tmp);
   } catch {

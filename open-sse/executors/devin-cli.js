@@ -24,6 +24,7 @@ import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
 import { BaseExecutor } from "./base.js";
+import { tempDir } from "../utils/tempDir.js";
 
 // ─── Binary discovery ────────────────────────────────────────────────────────
 
@@ -105,7 +106,7 @@ rl.on("line", (line) => {
 `.trimStart();
 
 function ensureClientToolsScript() {
-  const scriptPath = path.join(os.tmpdir(), "9router-devin-client-tools.mjs");
+  const scriptPath = path.join(tempDir(), "9router-devin-client-tools.mjs");
   // Always rewrite so script upgrades land without a process restart.
   fs.writeFileSync(scriptPath, CLIENT_TOOLS_MCP_SCRIPT);
   return scriptPath;
@@ -244,7 +245,7 @@ function resolveWorkspaceCwd(body) {
       /* ignore */
     }
   }
-  return os.tmpdir();
+  return tempDir();
 }
 
 // ─── Multi-turn message → single prompt builder ─────────────────────────────
@@ -368,7 +369,7 @@ export class DevinCliExecutor extends BaseExecutor {
     }
     if (Object.keys(mcpServers).length) {
       try {
-        mcpConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), "devin-mcp-"));
+        mcpConfigDir = fs.mkdtempSync(path.join(tempDir(), "devin-mcp-"));
         const cfgDev = path.join(mcpConfigDir, "devin");
         fs.mkdirSync(cfgDev, { recursive: true });
         fs.writeFileSync(

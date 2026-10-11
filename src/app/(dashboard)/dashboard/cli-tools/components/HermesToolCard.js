@@ -20,12 +20,7 @@ export default function HermesToolCard({
   hasActiveProviders,
   apiKeys,
   activeProviders,
-  cloudEnabled,
   initialStatus,
-  tunnelEnabled,
-  tunnelPublicUrl,
-  tailscaleEnabled,
-  tailscaleUrl,
 }) {
   const [hermesStatus, setHermesStatus] = useState(initialStatus || null);
   const [checking, setChecking] = useState(false);
@@ -52,7 +47,6 @@ export default function HermesToolCard({
     if (!hermesStatus?.installed) return null;
     const cfg = hermesStatus.settings?.model;
     if (!cfg?.base_url) return "not_configured";
-    if (matchKnownEndpoint(cfg.base_url, { tunnelPublicUrl, tailscaleUrl })) return "configured";
     return "other";
   };
 
@@ -60,7 +54,6 @@ export default function HermesToolCard({
 
   // Same three-state rule as the header badge, evaluated per profile from the list payload.
   const profileStatus = (p) => {
-    if (p.has9Router || (p.baseUrl && matchKnownEndpoint(p.baseUrl, { tunnelPublicUrl, tailscaleUrl }))) return "configured";
     if (p.baseUrl) return "other";
     return "not_configured";
   };
@@ -187,7 +180,6 @@ export default function HermesToolCard({
   const getKeyToUse = () =>
     selectedApiKey?.trim()
       || (apiKeys?.length > 0 ? apiKeys[0].key : null)
-      || (!cloudEnabled ? "sk_9router" : null);
 
   const profileLabel = (name) => (name === "default" ? "default profile" : `profile "${name}"`);
 
@@ -213,7 +205,6 @@ export default function HermesToolCard({
       const data = await res.json();
       if (res.ok) {
         // Remember the endpoint so it stays selectable next time
-        rememberEndpoint(getEffectiveBaseUrl(), { tunnelPublicUrl, tailscaleUrl });
         setMessage({ type: "success", text: `Settings applied to ${profileLabel(activeProfile)}!` });
         checkStatus();
         fetchProfiles();
@@ -235,7 +226,7 @@ export default function HermesToolCard({
   const handleApplyAll = async () => {
     const endpoint = getEffectiveBaseUrl();
     const isKnown =
-      matchKnownEndpoint(endpoint, { tunnelPublicUrl, tailscaleUrl })
+      matchKnownEndpoint(endpoint)
       || readPresets().some((p) => (p.baseUrl || "").replace(/\/+$/, "") === endpoint.replace(/\/+$/, ""));
     if (!isKnown) {
       setMessage({
@@ -260,7 +251,6 @@ export default function HermesToolCard({
       });
       const data = await res.json();
       if (res.ok && data.bulk) {
-        rememberEndpoint(endpoint, { tunnelPublicUrl, tailscaleUrl });
         const skipped = (data.results || []).filter((r) => r.status !== "updated");
         if (skipped.length === 0) {
           setMessage({ type: "success", text: `Endpoint and API key applied to ${data.updated} profile(s).` });
@@ -326,7 +316,7 @@ export default function HermesToolCard({
   const getManualConfigs = () => {
     const keyToUse = (selectedApiKey && selectedApiKey.trim())
       ? selectedApiKey
-      : (!cloudEnabled ? "sk_9router" : "<API_KEY_FROM_DASHBOARD>");
+      : "sk_lllrouter";
 
     const base = getEffectiveBaseUrl();
     const homeDir = activeProfile === "default" ? "~/.hermes" : `~/.hermes/profiles/${activeProfile}`;
@@ -459,10 +449,6 @@ export default function HermesToolCard({
                     value={customBaseUrl || getEffectiveBaseUrl()}
                     onChange={setCustomBaseUrl}
                     requiresExternalUrl={tool.requiresExternalUrl}
-                    tunnelEnabled={tunnelEnabled}
-                    tunnelPublicUrl={tunnelPublicUrl}
-                    tailscaleEnabled={tailscaleEnabled}
-                    tailscaleUrl={tailscaleUrl}
                     currentUrl={currentBaseUrl}
                   />
                 </div>
@@ -480,7 +466,6 @@ export default function HermesToolCard({
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr_auto] sm:items-center sm:gap-2">
                   <span className="text-xs font-semibold text-text-main sm:text-right sm:text-sm">API Key</span>
                   <span className="material-symbols-outlined hidden text-text-muted text-[14px] sm:inline">arrow_forward</span>
-                  <ApiKeySelect value={selectedApiKey} onChange={setSelectedApiKey} apiKeys={apiKeys} cloudEnabled={cloudEnabled} />
                 </div>
 
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr_auto] sm:items-center sm:gap-2">

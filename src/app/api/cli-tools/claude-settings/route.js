@@ -6,7 +6,7 @@ import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
-import { DEFAULT_PLUGINS } from "@/shared/constants/coworkPlugins";
+const DEFAULT_PLUGINS = [{ name: "exa", transport: "http", url: "https://mcp.exa.ai/mcp" }]; // ponytail: inline giu toggle exa, xoa khi bo exa
 
 const execAsync = promisify(exec);
 

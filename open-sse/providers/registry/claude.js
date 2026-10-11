@@ -38,7 +38,7 @@ export default {
       "X-Stainless-Timeout": "600",
     },
     quirks: {
-      cloakToolsOnOAuth: true,
+      cloakToolsOnOAuth: false,
     },
     auth: {
       apiKey: {

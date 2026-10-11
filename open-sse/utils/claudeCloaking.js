@@ -6,10 +6,12 @@ const CC_ENTRYPOINT = "sdk-cli";
 
 // Generate the billing header expected from current Claude Code clients.
 // x-anthropic-billing-header: cc_version=<ver>.<build>; cc_entrypoint=sdk-cli; cch=<hash>;
+// LLLRouter: build fragment derives deterministically from the payload hash so the
+// system prefix stays byte-stable across requests (prompt-cache friendly).
 function generateBillingHeader(payload) {
   const content = JSON.stringify(payload);
   const cch = createHash("sha256").update(content).digest("hex").slice(0, 5);
-  const buildHash = randomBytes(2).toString("hex").slice(0, 3);
+  const buildHash = createHash("sha256").update(`build:${content}`).digest("hex").slice(0, 3);
   return `x-anthropic-billing-header: cc_version=${CLAUDE_CLI_VERSION}.${buildHash}; cc_entrypoint=${CC_ENTRYPOINT}; cch=${cch};`;
 }
 

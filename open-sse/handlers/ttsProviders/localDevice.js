@@ -2,8 +2,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { tempDir } from "../../utils/tempDir.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -64,7 +64,7 @@ export async function fetchLocalDeviceVoices() {
 }
 
 async function synthesizeMacOrWin(text, voiceId) {
-  const dir = await mkdtemp(join(tmpdir(), "tts-"));
+  const dir = await mkdtemp(join(tempDir(), "tts-"));
   const aiffPath = join(dir, "out.aiff");
   const mp3Path = join(dir, "out.mp3");
   try {

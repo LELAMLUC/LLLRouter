@@ -6,7 +6,7 @@ import { readKeyPresets, upsertKeyPreset, deleteKeyPreset, subscribeKeyPresets }
 const CUSTOM_VALUE = "__custom__";
 const SAVE_VALUE = "__save_key__";
 
-export default function ApiKeySelect({ value, onChange, apiKeys = [], cloudEnabled = false, className = "" }) {
+export default function ApiKeySelect({ value, onChange, apiKeys = [], className = "" }) {
   const [savedKeys, setSavedKeys] = useState([]);
   // Custom mode is sticky once the user types, so an emptied input doesn't jump back to a dropdown option
   const [customMode, setCustomMode] = useState(false);
@@ -73,7 +73,7 @@ export default function ApiKeySelect({ value, onChange, apiKeys = [], cloudEnabl
   if (noKeys) {
     return (
       <span className={`min-w-0 rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5 ${className}`}>
-        {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_9router (default)"}
+        sk_lllrouter (default)
       </span>
     );
   }
