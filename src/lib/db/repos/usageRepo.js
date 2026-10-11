@@ -14,6 +14,12 @@ const PENDING_TIMEOUT_MS = 60 * 1000;
 const RING_CAP = 50;
 const CONN_CACHE_TTL_MS = 30 * 1000;
 const PERIOD_MS = { "24h": 86400000, "7d": 604800000, "30d": 2592000000, "60d": 5184000000 };
+// usageHistory is insert-only unless pruned: the ring needs 50 rows, the
+// lastUsed overlay and today/24h views need 2 days, so 7 days is a safe floor.
+const HISTORY_RETENTION_DAYS = 7;
+const HISTORY_MAX_ROWS = 100_000;
+const PRUNE_EVERY_WRITES = 200;
+let historyWritesSincePrune = 0;
 
 // In-memory state shared across Next.js modules
 if (!global._pendingRequests) global._pendingRequests = { byModel: {}, byAccount: {} };
@@ -308,10 +314,28 @@ export async function saveRequestUsage(entry) {
     if (inserted) {
       pushToRing(entry);
       scheduleStatsEvent("update", 250);
+      if (++historyWritesSincePrune % PRUNE_EVERY_WRITES === 0) pruneUsageHistory().catch(() => {});
     }
   } catch (e) {
     console.error("Failed to save usage stats:", e);
   }
+}
+
+export async function pruneUsageHistory() {
+  const db = await getAdapter();
+  const cutoff = new Date(Date.now() - HISTORY_RETENTION_DAYS * 86400000).toISOString();
+
+  db.transaction(() => {
+    db.run(`DELETE FROM usageHistory WHERE timestamp < ?`, [cutoff]);
+
+    const cnt = db.get(`SELECT COUNT(*) as c FROM usageHistory`);
+    if (cnt && cnt.c > HISTORY_MAX_ROWS) {
+      db.run(
+        `DELETE FROM usageHistory WHERE id IN (SELECT id FROM usageHistory ORDER BY timestamp ASC LIMIT ?)`,
+        [cnt.c - HISTORY_MAX_ROWS]
+      );
+    }
+  });
 }
 
 export async function getUsageHistory(filter = {}) {

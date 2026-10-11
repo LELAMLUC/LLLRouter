@@ -10,8 +10,16 @@ function stripAnthropicBillingHeader(text) {
   return text.replace(/^x-anthropic-billing-header:[^\n]*(?:\r?\n)?/i, "");
 }
 
+// cache_control has no OpenAI equivalent — carry it over verbatim for providers
+// that accept the marker on OpenAI blocks (quirks.preserveCacheControl); a strict
+// OpenAI target rejects the unknown field.
+function cacheFields(block, keepCache) {
+  return keepCache && block?.cache_control ? { cache_control: block.cache_control } : null;
+}
+
 // Convert Claude request to OpenAI format
-export function claudeToOpenAIRequest(model, body, stream) {
+export function claudeToOpenAIRequest(model, body, stream, credentials, opts = {}) {
+  const keepCache = !!opts?.preserveCacheControl;
   const result = {
     model: model,
     messages: [],
@@ -46,7 +54,7 @@ export function claudeToOpenAIRequest(model, body, stream) {
   if (body.messages && Array.isArray(body.messages)) {
     for (let i = 0; i < body.messages.length; i++) {
       const msg = body.messages[i];
-      const converted = convertClaudeMessage(msg);
+      const converted = convertClaudeMessage(msg, keepCache);
       if (converted) {
         // Handle array of messages (multiple tool results)
         if (Array.isArray(converted)) {
@@ -71,7 +79,8 @@ export function claudeToOpenAIRequest(model, body, stream) {
         name: tool.name,
         description: String(tool.description || ""),
         parameters: tool.input_schema || { type: "object", properties: {} }
-      }
+      },
+      ...cacheFields(tool, keepCache)
     }));
   }
 
@@ -141,7 +150,7 @@ function systemReminderText(content) {
 }
 
 // Convert single Claude message - returns single message or array of messages
-function convertClaudeMessage(msg) {
+function convertClaudeMessage(msg, keepCache = false) {
   // Some clients send content as a single block object; normalize to the
   // one-element array every branch below (the system-reminder fold included)
   // expects. Must run BEFORE the role branch: systemReminderText only reads
@@ -171,7 +180,7 @@ function convertClaudeMessage(msg) {
     for (const block of msg.content) {
       switch (block.type) {
         case CLAUDE_BLOCK.TEXT:
-          parts.push({ type: OPENAI_BLOCK.TEXT, text: block.text });
+          parts.push({ type: OPENAI_BLOCK.TEXT, text: block.text, ...cacheFields(block, keepCache) });
           break;
 
         case CLAUDE_BLOCK.IMAGE:
@@ -180,7 +189,8 @@ function convertClaudeMessage(msg) {
               type: OPENAI_BLOCK.IMAGE_URL,
               image_url: {
                 url: encodeDataUri(block.source.media_type, block.source.data)
-              }
+              },
+              ...cacheFields(block, keepCache)
             });
           }
           break;

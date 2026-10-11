@@ -202,7 +202,7 @@ function normalizeResponsesTools(body) {
 // with a clear shape instead of upstream as InputValidationError.
 function sanitizeResponsesItems(body) {
   if (!Array.isArray(body.input)) return;
-  body.input = body.input.filter((item) => {
+  body.input = body.input.filter((item, i) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) return true;
     // Strip prior-turn reasoning items: Muse Spark contributor models route to
     // an upstream Console backend where encrypted_content cannot be validated across
@@ -213,12 +213,12 @@ function sanitizeResponsesItems(body) {
     if (item.type === "function_call") {
       if (!item.name || typeof item.name !== "string" || item.name.trim() === "") return false;
       item.name = item.name.trim().slice(0, MAX_TOOL_NAME_LEN);
-      item.call_id = clampResponsesCallId(item.call_id);
+      item.call_id = clampResponsesCallId(item.call_id, i);
       item.arguments = coerceResponsesArguments(item.arguments);
       return true;
     }
     if (item.type === "function_call_output") {
-      item.call_id = clampResponsesCallId(item.call_id);
+      item.call_id = clampResponsesCallId(item.call_id, i);
       item.output = coerceResponsesOutput(item.output);
       return true;
     }

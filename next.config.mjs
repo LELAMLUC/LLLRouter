@@ -2,15 +2,16 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { PHASE_PRODUCTION_BUILD } from "next/constants.js";
 
 // Build isolation: @vercel/nft (Next's file tracer) resolves the config paths the
 // app discovers from os.homedir()/APPDATA/LOCALAPPDATA/tmpdir and then walks every
 // match. On a real user profile that means gigabytes of memory, the developer's own
 // config files inside the standalone trace, and on Windows a hard failure as soon
 // as one profile entry is unreadable (a stale temp dir owned by another account).
-// Production builds therefore run against a throwaway profile; the running app
-// still reads the real one.
-if (process.env.NODE_ENV === "production") {
+// Production builds therefore run against a throwaway profile, while the running app
+// keeps the real one.
+function isolateBuildProfile() {
   const buildHome = join(tmpdir(), "lllrouter-build-home");
   const buildAppData = join(buildHome, "AppData");
   const buildTemp = join(buildHome, "tmp");
@@ -115,4 +116,10 @@ const nextConfig = {
   }
 };
 
-export default nextConfig;
+// The phase is the only reliable signal for "this load is a production build":
+// NODE_ENV is also "production" for the standalone server (which must keep the real
+// profile), and NEXT_PHASE is not set until deep inside the build.
+export default function config(phase) {
+  if (phase === PHASE_PRODUCTION_BUILD) isolateBuildProfile();
+  return nextConfig;
+}

@@ -342,7 +342,7 @@ export function openaiToOpenAIResponsesRequest(model, body, stream, credentials)
   let hasSystemMessage = false;
   const messages = body.messages || [];
 
-  for (const msg of messages) {
+  for (const [i, msg] of messages.entries()) {
     if (msg.role === ROLE.SYSTEM || msg.role === ROLE.DEVELOPER) {
       // Use the first instruction-bearing message as instructions.
       // OpenAI recommends role="developer" for GPT-5/Codex as the system-level prompt.
@@ -397,13 +397,13 @@ export function openaiToOpenAIResponsesRequest(model, body, stream, credentials)
 
     // Convert tool calls
     if (msg.role === ROLE.ASSISTANT && msg.tool_calls) {
-      for (const tc of msg.tool_calls) {
+      for (const [j, tc] of msg.tool_calls.entries()) {
         // Skip nameless calls — strict Responses upstreams reject them (#444)
         const name = typeof tc.function?.name === "string" ? tc.function.name.trim() : "";
         if (!name) continue;
         result.input.push({
           type: RESPONSES_ITEM.FUNCTION_CALL,
-          call_id: clampResponsesCallId(tc.id),
+          call_id: clampResponsesCallId(tc.id, `msg${i}_tc${j}`),
           name: name.slice(0, MAX_TOOL_NAME_LEN),
           arguments: coerceResponsesArguments(tc.function?.arguments)
         });
@@ -414,7 +414,7 @@ export function openaiToOpenAIResponsesRequest(model, body, stream, credentials)
     if (msg.role === ROLE.TOOL) {
       result.input.push({
         type: RESPONSES_ITEM.FUNCTION_CALL_OUTPUT,
-        call_id: clampResponsesCallId(msg.tool_call_id),
+        call_id: clampResponsesCallId(msg.tool_call_id, `msg${i}`),
         output: coerceResponsesOutput(msg.content)
       });
     }

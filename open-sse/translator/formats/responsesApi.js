@@ -26,13 +26,12 @@ export function normalizeResponsesInput(input) {
 // Strict Responses upstreams reject overlong call_ids with InputValidationError (#393).
 export const MAX_RESPONSES_CALL_ID_LEN = 64;
 
-// Fallback ids share one Date.now() when a batch of items is sanitized in a tight
-// loop — a per-process sequence keeps same-millisecond ids unique so
-// function_call ↔ function_call_output correlation never collides.
-let responsesCallIdSeq = 0;
-
-export function clampResponsesCallId(id) {
-  if (typeof id !== "string" || !id) return `call_${Date.now()}_${(responsesCallIdSeq += 1)}`;
+// Fallback id for a call the client left without one. It is derived from the
+// call's position (seed), never from the clock: the same history has to serialize
+// into the very same upstream body or the provider's prefix cache misses on every
+// request. Callers that own no stable position MUST pass one.
+export function clampResponsesCallId(id, seed) {
+  if (typeof id !== "string" || !id) return `call_${seed}`;
   return id.length > MAX_RESPONSES_CALL_ID_LEN ? id.substring(0, MAX_RESPONSES_CALL_ID_LEN) : id;
 }
 

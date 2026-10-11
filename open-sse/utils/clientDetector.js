@@ -11,6 +11,18 @@ const NATIVE_PAIRS = {
   "codex": ["codex"],
 };
 
+// Same native pairs, keyed by the client's wire format instead of its identity:
+// a request already in the provider's own format is lossless whatever UA sent it,
+// so it must not be detected through headers alone (any Anthropic-format client
+// that is not Claude Code was previously rewritten by the translator).
+// Gemini format is absent on purpose — gemini-cli wraps the body in its own
+// envelope, so source "gemini" is not the format that endpoint accepts.
+const NATIVE_FORMAT_PAIRS = {
+  claude: ["claude", "anthropic"],
+  "openai-responses": ["codex"],
+  antigravity: ["antigravity"],
+};
+
 /**
  * Detect which CLI tool is making the request.
  * Returns one of: "claude" | "gemini-cli" | "antigravity" | "codex" | null
@@ -59,6 +71,22 @@ export function isNativePassthrough(clientTool, provider) {
   const nativeProviders = NATIVE_PAIRS[clientTool];
   if (!nativeProviders) return false;
   // Support anthropic-compatible-* variants
+  const normalizedProvider = provider.startsWith("anthropic-compatible")
+    ? "anthropic"
+    : provider;
+  return nativeProviders.includes(normalizedProvider);
+}
+
+/**
+ * Same-format passthrough: the client's wire format is already the one the provider
+ * speaks (checked by the caller: sourceFormat === targetFormat), so the body can be
+ * forwarded untouched no matter which client sent it.
+ * @param {string} sourceFormat - Detected client format (FORMATS.*)
+ * @param {string} provider     - Provider ID
+ */
+export function isNativeFormatPassthrough(sourceFormat, provider) {
+  const nativeProviders = NATIVE_FORMAT_PAIRS[sourceFormat];
+  if (!nativeProviders) return false;
   const normalizedProvider = provider.startsWith("anthropic-compatible")
     ? "anthropic"
     : provider;
