@@ -9,6 +9,7 @@
     "build": "next build --webpack",
     "postbuild": "node scripts/copy-standalone-assets.mjs",
     "postbuild:bun": "node scripts/copy-standalone-assets.mjs",
+    "pack:npm": "node scripts/build-npm-package.mjs && npm pack ./npm-package --pack-destination .",
     "start": "node custom-server.js --port 20227",
     "dev:bun": "bun --bun next dev --webpack --port 20227",
     "build:bun": "bun --bun next build --webpack",
